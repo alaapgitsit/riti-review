@@ -1,0 +1,413 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Riti Flow Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=Mukta:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a pannable board. Each user flow is a lane of phone frames joined by labelled arrows;
+   a sticky toolbar switches language, age mode, zoom and frame length. Brand colours from theme v2. */
+:root {
+  --board: #E9EAF2;        /* board, cool grey biased to ink */
+  --dot: #CDD0E0;          /* board dot grid */
+  --panel: #FFFFFF;
+  --ink: #111844;
+  --ink-soft: #4A5079;
+  --line: #C9CCDD;
+  --pink: #FF414E;
+  --yellow: #FFDE22;
+  --on-yellow: #111844;
+  --arrow: #111844;
+  --ok: #1E7A45; --ok-bg: #E3F4EA; --fix-bg: #FFE6E8;
+  --shadow: 0 1px 2px rgba(17,24,68,.08), 0 8px 24px rgba(17,24,68,.10);
+  --f-display: "Plus Jakarta Sans", "Mukta", system-ui, sans-serif;
+  --f-body: "Plus Jakarta Sans", "Mukta", system-ui, sans-serif;
+  --f-deva: "Mukta", "Plus Jakarta Sans", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --board: #0B0F2E; --dot: #1C2350; --panel: #161C45; --ink: #EEF0FA; --ink-soft: #A3A8C8; --line: #2A3166;
+  --arrow: #EEF0FA; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.45); color-scheme: dark;
+  --ok: #3FBF73; --ok-bg: #123A27; --fix-bg: #4A1820;
+} }
+:root[data-theme="dark"] {
+  --board: #0B0F2E; --dot: #1C2350; --panel: #161C45; --ink: #EEF0FA; --ink-soft: #A3A8C8; --line: #2A3166;
+  --arrow: #EEF0FA; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.45); color-scheme: dark;
+  --ok: #3FBF73; --ok-bg: #123A27; --fix-bg: #4A1820;
+}
+html, body { height: 100%; }
+body { background: var(--board); color: var(--ink); font: 14px/1.45 var(--f-body); display: flex; flex-direction: column; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--panel); }
+
+/* Toolbar */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 10px; display: flex; flex-direction: column; gap: 8px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; min-width: 0; }
+.brand h1 { font: 800 18px/1.1 var(--f-display); margin: 0; letter-spacing: -.01em; }
+.brand h1 i { font-style: normal; color: var(--pink); }
+.meta { font: 12px var(--f-mono); color: var(--ink-soft); }
+.ctl { display: flex; align-items: center; gap: 6px; }
+.ctl > span { font: 600 11px var(--f-body); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; background: var(--board); }
+.seg button { border: 0; background: transparent; color: var(--ink); font: 600 13px var(--f-body); padding: 5px 12px; border-radius: 999px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--yellow); color: var(--on-yellow); }
+.seg button:focus-visible, .lanes a:focus-visible, .frame:focus-visible, .lb button:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
+.seg .deva { font-family: var(--f-deva); font-size: 14px; }
+.zoomval { font: 500 12px var(--f-mono); min-width: 3.5em; text-align: center; font-variant-numeric: tabular-nums; }
+.lanes { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.lanes a { flex: none; font: 600 12px var(--f-body); color: var(--ink); text-decoration: none; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); }
+.lanes a:hover { border-color: var(--ink); }
+
+/* Board */
+.board { flex: 1; overflow: auto; cursor: grab; background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 22px 22px; }
+.board.drag { cursor: grabbing; user-select: none; }
+.canvas { padding: 32px 40px 80px; display: flex; flex-direction: column; gap: 56px; width: max-content; }
+.lane-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; max-width: 900px; margin-bottom: 14px; }
+.lane-head h2 { font: 800 26px/1.1 var(--f-display); margin: 0; letter-spacing: -.015em; }
+.lane-head .n { font: 500 13px var(--f-mono); color: var(--pink); }
+.lane-head p { flex-basis: 100%; margin: 0; color: var(--ink-soft); font-size: 15px; max-width: 70ch; }
+.tag { font: 600 11px var(--f-body); text-transform: uppercase; letter-spacing: .07em; background: var(--yellow); color: var(--on-yellow); padding: 3px 8px; border-radius: 6px; }
+.track { display: flex; align-items: flex-start; }
+.step { display: flex; flex-direction: column; gap: 8px; }
+.cap { display: flex; align-items: baseline; gap: 8px; }
+.cap b { font: 700 15px var(--f-display); }
+.cap .idx { font: 500 12px var(--f-mono); color: var(--ink-soft); }
+.cap code { font: 12px var(--f-mono); color: var(--ink-soft); margin-left: auto; }
+.pair { display: flex; gap: 12px; }
+.frame { position: relative; display: block; padding: 0; border: 0; background: var(--panel); border-radius: 26px; box-shadow: var(--shadow); overflow: hidden; cursor: zoom-in; width: 300px; }
+.frame img { display: block; width: 100%; height: auto; }
+.short .frame img { aspect-ratio: 390 / 844; object-fit: cover; object-position: top; }
+.frame .lang { position: absolute; bottom: 10px; left: 10px; font: 600 11px var(--f-body); background: var(--ink); color: var(--board); padding: 2px 8px; border-radius: 999px; }
+.frame .missing { width: 100%; aspect-ratio: 390/844; display: grid; place-items: center; color: var(--ink-soft); font-size: 13px; padding: 20px; text-align: center; }
+.edge { width: 150px; flex: none; align-self: stretch; display: flex; flex-direction: column; justify-content: flex-start; padding-top: 180px; gap: 6px; align-items: center; }
+.edge svg { width: 100%; height: 18px; overflow: visible; }
+.edge .lbl { font: 600 13px var(--f-body); text-align: center; padding: 0 10px; line-height: 1.3; }
+.edge .lbl .hi { display: block; font-family: var(--f-deva); font-weight: 600; color: var(--ink-soft); }
+.edge .from { font: 12px var(--f-mono); color: var(--pink); text-align: center; }
+.edge.branch .shaft { stroke-dasharray: 5 5; }
+
+/* Lightbox */
+.lb { position: fixed; inset: 0; z-index: 20; background: color-mix(in srgb, var(--board) 92%, transparent); display: flex; flex-direction: column; backdrop-filter: blur(4px); }
+.lb[hidden] { display: none !important; }
+.lb header { display: flex; align-items: center; gap: 12px; padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); border-bottom: 1px solid var(--line); background: var(--panel); }
+.lb header b { font: 700 16px var(--f-display); }
+.lb header span { color: var(--ink-soft); font: 12px var(--f-mono); }
+.lb header .sp { margin-left: auto; }
+.lb button.ic { border: 1px solid var(--line); background: var(--panel); color: var(--ink); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font: 600 16px var(--f-body); }
+.lb .body { flex: 1; overflow: auto; display: flex; justify-content: center; gap: 24px; padding: 24px 16px; }
+.lb .body figure { margin: 0; display: flex; flex-direction: column; gap: 8px; align-items: center; min-width: 0; }
+.lb .body figcaption { font: 600 12px var(--f-body); color: var(--ink-soft); text-transform: uppercase; letter-spacing: .07em; }
+.lb .body img { width: min(390px, 86vw); border-radius: 24px; box-shadow: var(--shadow); }
+.foot { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
+@media (max-width: 640px) { .ctl > span { display: none; } .canvas { padding: 20px 16px 60px; } .brand .meta { display: none; } }
+@media (prefers-reduced-motion: no-preference) { .frame { transition: transform .15s ease; } .frame:hover { transform: translateY(-2px); } }
+
+/* Review: a reviewer ticks each screen (approve / needs change, with a note); saved per reviewer in the
+   artifact's database (reviews/<reviewer id>). The Reviews panel counts screens per reviewer for payment. */
+.cell { display: flex; flex-direction: column; gap: 8px; width: 300px; }
+.cell.ok .frame { box-shadow: 0 0 0 3px var(--ok), var(--shadow); }
+.cell.fix .frame { box-shadow: 0 0 0 3px var(--pink), var(--shadow); }
+.cell.done-hidden { display: none; }
+.rv { display: none; flex-wrap: wrap; gap: 6px; align-items: center; }
+body.reviewing .rv { display: flex; }
+.rv button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: 600 12.5px var(--f-body); padding: 6px 11px; border-radius: 999px; cursor: pointer; }
+.rv button.ok[aria-pressed="true"] { background: var(--ok-bg); border-color: var(--ok); }
+.rv button.fix[aria-pressed="true"] { background: var(--fix-bg); border-color: var(--pink); }
+.rv button:disabled { opacity: .55; cursor: not-allowed; }
+.rv textarea { flex-basis: 100%; min-height: 54px; font: 13px/1.4 var(--f-body); border: 1px solid var(--line); border-radius: 12px; padding: 7px 9px; background: var(--panel); color: var(--ink); resize: vertical; }
+.rv .who { font: 500 11.5px var(--f-mono); color: var(--ink-soft); }
+#rvbar[hidden] { display: none !important; }
+#rvmsg { font: 12px var(--f-body); color: var(--ink-soft); }
+.rp { position: fixed; inset: 0; z-index: 25; background: color-mix(in srgb, var(--board) 94%, transparent); display: flex; flex-direction: column; backdrop-filter: blur(4px); }
+.rp[hidden] { display: none !important; }
+.rp header { display: flex; align-items: center; gap: 12px; padding: 12px max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px)); border-bottom: 1px solid var(--line); background: var(--panel); }
+.rp header b { font: 700 16px var(--f-display); }
+.rp header .sp { margin-left: auto; }
+.rp .body { flex: 1; overflow: auto; padding: 20px 16px 40px; max-width: 900px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+.rp .sum { font-size: 15px; margin: 0 0 16px; }
+.rp table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
+.rp th, .rp td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.rp th { font: 600 11px var(--f-body); text-transform: uppercase; letter-spacing: .07em; color: var(--ink-soft); }
+.rp td.n, .rp th.n { text-align: right; font-variant-numeric: tabular-nums; }
+.rp .act { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+.pill { border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: 600 13px var(--f-body); padding: 7px 14px; border-radius: 999px; cursor: pointer; }
+.pill[aria-pressed="true"] { background: var(--yellow); color: var(--on-yellow); border-color: var(--yellow); }
+.rp .note { color: var(--ink-soft); font-size: 13px; margin-top: 14px; max-width: 70ch; }
+@media (max-width: 640px) { .rp th, .rp td { padding: 8px; font-size: 13px; }
+  .bar { gap: 6px; padding-block: 8px; } .bar .row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 8px; } .bar .row::-webkit-scrollbar { display: none; }
+  .brand { flex: none; } .ctl, .pill { flex: none; } #rvmsg { white-space: nowrap; } }
+</style>
+
+<div class="bar">
+  <div class="row">
+    <div class="brand"><h1>riti<i>.</i> flow map</h1><span class="meta" id="meta"></span></div>
+    <div class="ctl"><span>Language</span><div class="seg" id="lang" role="group" aria-label="Language">
+      <button data-v="en" aria-pressed="true">English</button><button data-v="hi" class="deva" aria-pressed="false">हिन्दी</button><button data-v="both" aria-pressed="false">Both</button></div></div>
+    <div class="ctl"><span>Mode</span><div class="seg" id="mode" role="group" aria-label="Age mode">
+      <button data-v="adult" aria-pressed="true">Adult</button><button data-v="kid" aria-pressed="false">Kid</button><button data-v="elder" aria-pressed="false">Elder</button></div></div>
+    <div class="ctl"><span>Screens</span><div class="seg" id="len" role="group" aria-label="Screen length">
+      <button data-v="short" aria-pressed="true">First view</button><button data-v="full" aria-pressed="false">Full length</button></div></div>
+    <div class="ctl"><span>Zoom</span><div class="seg" role="group" aria-label="Zoom">
+      <button id="zout" aria-label="Zoom out">−</button><span class="zoomval" id="zval">100%</span><button id="zin" aria-label="Zoom in">+</button><button id="zfit">Fit</button></div></div>
+  </div>
+  <div class="row" id="rvbar" hidden>
+    <button class="pill" id="rvon" aria-pressed="false">Review screens</button>
+    <button class="pill" id="rvhide" aria-pressed="false">Hide screens I've reviewed</button>
+    <button class="pill" id="rvopen">Reviews</button>
+    <span id="rvmsg" role="status"></span>
+  </div>
+  <nav class="lanes" id="lanes" aria-label="Flows"></nav>
+</div>
+
+<main class="board" id="board"><div class="canvas" id="canvas"></div></main>
+
+<div class="lb" id="lb" hidden role="dialog" aria-modal="true" aria-labelledby="lbt">
+  <header><button class="ic" id="lbprev" aria-label="Previous screen">←</button><button class="ic" id="lbnext" aria-label="Next screen">→</button>
+    <b id="lbt"></b><span id="lbr"></span><span class="sp"></span><button class="ic" id="lbx" aria-label="Close">✕</button></header>
+  <div class="body" id="lbb"></div>
+</div>
+
+<div class="rp" id="rp" hidden role="dialog" aria-modal="true" aria-labelledby="rpt">
+  <header><b id="rpt">Reviews</b><span class="sp"></span><button class="ic" id="rpx" aria-label="Close" style="border:1px solid var(--line);background:var(--panel);color:var(--ink);width:36px;height:36px;border-radius:50%;cursor:pointer">✕</button></header>
+  <div class="body" id="rpb"></div>
+</div>
+
+<script>
+const M = {"generated":"2026-11-25T03:59:40.813Z","commit":"cd1636c","width":390,"flows":[{"id":"first-run","title":"First run","about":"A new family installs the app: language, family members, aims, reminder, free trial. The age mode is chosen per person here, so these screens look the same in every mode.","sameInAllModes":true,"steps":[{"id":"ob-welcome","name":"Welcome","route":"/","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-ob-welcome.jpg","h":844},"hi-adult":{"file":"shots/hi-adult-ob-welcome.jpg","h":844}}},{"id":"ob-family","name":"Family","route":null,"from":null,"edge":{"en":"Continue","hi":"आगे चलें"},"shots":{"en-adult":{"file":"shots/en-adult-ob-family.jpg","h":877},"hi-adult":{"file":"shots/hi-adult-ob-family.jpg","h":903}}},{"id":"ob-aims","name":"Aims","route":null,"from":null,"edge":{"en":"Continue","hi":"आगे चलें"},"shots":{"en-adult":{"file":"shots/en-adult-ob-aims.jpg","h":844},"hi-adult":{"file":"shots/hi-adult-ob-aims.jpg","h":844}}},{"id":"ob-reminder","name":"Reminder","route":null,"from":null,"edge":{"en":"Continue","hi":"आगे चलें"},"shots":{"en-adult":{"file":"shots/en-adult-ob-reminder.jpg","h":844},"hi-adult":{"file":"shots/hi-adult-ob-reminder.jpg","h":844}}},{"id":"ob-trial","name":"Free trial","route":null,"from":null,"edge":{"en":"Continue","hi":"आगे चलें"},"shots":{"en-adult":{"file":"shots/en-adult-ob-trial.jpg","h":844},"hi-adult":{"file":"shots/hi-adult-ob-trial.jpg","h":844}}},{"id":"today-first","name":"Today (first visit)","route":null,"from":null,"edge":{"en":"Start free trial","hi":"मुफ़्त ट्रायल शुरू करें"},"shots":{"en-adult":{"file":"shots/en-adult-today-first.jpg","h":973},"hi-adult":{"file":"shots/hi-adult-today-first.jpg","h":1008}}}]},{"id":"daily-aarti","title":"Daily aarti","about":"The core daily loop: a thought, two picks, and the aarti with lyrics, meaning and line-by-line highlight.","sameInAllModes":false,"steps":[{"id":"today","name":"Today","route":"/","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-today.jpg","h":973},"en-kid":{"file":"shots/en-kid-today.jpg","h":1022},"en-elder":{"file":"shots/en-elder-today.jpg","h":1262},"hi-adult":{"file":"shots/hi-adult-today.jpg","h":1008},"hi-kid":{"file":"shots/hi-kid-today.jpg","h":1070},"hi-elder":{"file":"shots/hi-elder-today.jpg","h":1250}}},{"id":"aarti","name":"Aarti player","route":"/session/om-jai-jagdish-hare","from":null,"edge":{"en":"Tap the aarti card","hi":"आरती वाले कार्ड पर टैप"},"shots":{"en-adult":{"file":"shots/en-adult-aarti.jpg","h":4211},"en-kid":{"file":"shots/en-kid-aarti.jpg","h":4601},"en-elder":{"file":"shots/en-elder-aarti.jpg","h":4800},"hi-adult":{"file":"shots/hi-adult-aarti.jpg","h":4034},"hi-kid":{"file":"shots/hi-kid-aarti.jpg","h":4364},"hi-elder":{"file":"shots/hi-elder-aarti.jpg","h":4800}}},{"id":"aarti-playing","name":"Aarti playing","route":null,"from":null,"edge":{"en":"Play","hi":"चलाएँ"},"shots":{"en-adult":{"file":"shots/en-adult-aarti-playing.jpg","h":4211},"en-kid":{"file":"shots/en-kid-aarti-playing.jpg","h":4601},"en-elder":{"file":"shots/en-elder-aarti-playing.jpg","h":4800},"hi-adult":{"file":"shots/hi-adult-aarti-playing.jpg","h":4034},"hi-kid":{"file":"shots/hi-kid-aarti-playing.jpg","h":4364},"hi-elder":{"file":"shots/hi-elder-aarti-playing.jpg","h":4800}}},{"id":"aarti-done","name":"Completion","route":null,"from":null,"edge":{"en":"Mark as done","hi":"हो गया"},"shots":{"en-adult":{"file":"shots/en-adult-aarti-done.jpg","h":844},"en-kid":{"file":"shots/en-kid-aarti-done.jpg","h":844},"en-elder":{"file":"shots/en-elder-aarti-done.jpg","h":844},"hi-adult":{"file":"shots/hi-adult-aarti-done.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-aarti-done.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-aarti-done.jpg","h":844}}}]},{"id":"chants","title":"Chalisa and mantras","about":"The same player carries all 12 sung and chanted pieces. Mantras repeat in rounds; the melody guide adds a draft harmonium line to the sing-along track.","sameInAllModes":false,"steps":[{"id":"chalisa","name":"Hanuman Chalisa","route":"/session/hanuman-chalisa","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-chalisa.jpg","h":4800},"en-kid":{"file":"shots/en-kid-chalisa.jpg","h":4800},"en-elder":{"file":"shots/en-elder-chalisa.jpg","h":4800},"hi-adult":{"file":"shots/hi-adult-chalisa.jpg","h":4800},"hi-kid":{"file":"shots/hi-kid-chalisa.jpg","h":4800},"hi-elder":{"file":"shots/hi-elder-chalisa.jpg","h":4800}}},{"id":"mantra","name":"Gayatri Mantra","route":"/session/gayatri-mantra","from":"chalisa","edge":{"en":"Or pick a mantra","hi":"या कोई मंत्र चुनिए"},"shots":{"en-adult":{"file":"shots/en-adult-mantra.jpg","h":1696},"en-kid":{"file":"shots/en-kid-mantra.jpg","h":1791},"en-elder":{"file":"shots/en-elder-mantra.jpg","h":2006},"hi-adult":{"file":"shots/hi-adult-mantra.jpg","h":1709},"hi-kid":{"file":"shots/hi-kid-mantra.jpg","h":1780},"hi-elder":{"file":"shots/hi-elder-mantra.jpg","h":1936}}},{"id":"mantra-guide","name":"Melody guide on","route":null,"from":null,"edge":{"en":"Melody guide","hi":"धुन के साथ"},"shots":{"en-adult":{"file":"shots/en-adult-mantra-guide.jpg","h":1773},"en-kid":{"file":"shots/en-kid-mantra-guide.jpg","h":1871},"en-elder":{"file":"shots/en-elder-mantra-guide.jpg","h":2124},"hi-adult":{"file":"shots/hi-adult-mantra-guide.jpg","h":1794},"hi-kid":{"file":"shots/hi-kid-mantra-guide.jpg","h":1868},"hi-elder":{"file":"shots/hi-elder-mantra-guide.jpg","h":2040}}}]},{"id":"meditation","title":"Meditation","about":"From the Practice tab into a guided breathing session, with length and style choices.","sameInAllModes":false,"steps":[{"id":"practice","name":"Library","route":"/practice","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-practice.jpg","h":1887},"en-kid":{"file":"shots/en-kid-practice.jpg","h":1956},"en-elder":{"file":"shots/en-elder-practice.jpg","h":1465},"hi-adult":{"file":"shots/hi-adult-practice.jpg","h":1955},"hi-kid":{"file":"shots/hi-kid-practice.jpg","h":2056},"hi-elder":{"file":"shots/hi-elder-practice.jpg","h":1438}}},{"id":"open-chant","name":"Choose how: a chant","route":"/open/om-jai-jagdish-hare","from":null,"edge":{"en":"Tap a card","hi":"किसी कार्ड पर टैप"},"shots":{"en-adult":{"file":"shots/en-adult-open-chant.jpg","h":844},"en-kid":{"file":"shots/en-kid-open-chant.jpg","h":844},"en-elder":{"file":"shots/en-elder-open-chant.jpg","h":844},"hi-adult":{"file":"shots/hi-adult-open-chant.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-open-chant.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-open-chant.jpg","h":844}}},{"id":"open-story","name":"Choose how: a story","route":"/open/rama-and-the-squirrel","from":"practice","edge":{"en":"Tap a card","hi":"किसी कार्ड पर टैप"},"shots":{"en-adult":{"file":"shots/en-adult-open-story.jpg","h":844},"en-kid":{"file":"shots/en-kid-open-story.jpg","h":844},"en-elder":{"file":"shots/en-elder-open-story.jpg","h":956},"hi-adult":{"file":"shots/hi-adult-open-story.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-open-story.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-open-story.jpg","h":898}}},{"id":"shelf","name":"See all: meditations","route":"/shelf/meditations","from":"practice","edge":{"en":"See all","hi":"सब देखिए"},"shots":{"en-adult":{"file":"shots/en-adult-shelf.jpg","h":1049},"en-kid":{"file":"shots/en-kid-shelf.jpg","h":1142},"en-elder":{"file":"shots/en-elder-shelf.jpg","h":1232},"hi-adult":{"file":"shots/hi-adult-shelf.jpg","h":1061},"hi-kid":{"file":"shots/hi-kid-shelf.jpg","h":1154},"hi-elder":{"file":"shots/hi-elder-shelf.jpg","h":1232}}},{"id":"med-setup","name":"Meditation setup","route":"/session/breath-focus","from":null,"edge":{"en":"Tap a meditation","hi":"किसी ध्यान पर टैप"},"shots":{"en-adult":{"file":"shots/en-adult-med-setup.jpg","h":844},"en-kid":{"file":"shots/en-kid-med-setup.jpg","h":844},"en-elder":{"file":"shots/en-elder-med-setup.jpg","h":927},"hi-adult":{"file":"shots/hi-adult-med-setup.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-med-setup.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-med-setup.jpg","h":880}}},{"id":"med-running","name":"Meditation running","route":null,"from":null,"edge":{"en":"Begin","hi":"शुरू करें"},"shots":{"en-adult":{"file":"shots/en-adult-med-running.jpg","h":844},"en-kid":{"file":"shots/en-kid-med-running.jpg","h":844},"en-elder":{"file":"shots/en-elder-med-running.jpg","h":844},"hi-adult":{"file":"shots/hi-adult-med-running.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-med-running.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-med-running.jpg","h":844}}},{"id":"med-done","name":"Completion","route":null,"from":null,"edge":{"en":"End session","hi":"ख़त्म करें"},"shots":{"en-adult":{"file":"shots/en-adult-med-done.jpg","h":844},"en-kid":{"file":"shots/en-kid-med-done.jpg","h":844},"en-elder":{"file":"shots/en-elder-med-done.jpg","h":844},"hi-adult":{"file":"shots/hi-adult-med-done.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-med-done.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-med-done.jpg","h":844}}}]},{"id":"story","title":"Kid story","about":"“Why we light diyas” in four illustrated parts.","sameInAllModes":false,"steps":[{"id":"story-1","name":"Story, part 1","route":"/session/why-we-light-diyas","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-story-1.jpg","h":1035},"en-kid":{"file":"shots/en-kid-story-1.jpg","h":1104},"en-elder":{"file":"shots/en-elder-story-1.jpg","h":1196},"hi-adult":{"file":"shots/hi-adult-story-1.jpg","h":947},"hi-kid":{"file":"shots/hi-kid-story-1.jpg","h":1033},"hi-elder":{"file":"shots/hi-elder-story-1.jpg","h":1169}}},{"id":"story-2","name":"Part 2","route":null,"from":null,"edge":{"en":"Next","hi":"आगे"},"shots":{"en-adult":{"file":"shots/en-adult-story-2.jpg","h":925},"en-kid":{"file":"shots/en-kid-story-2.jpg","h":1044},"en-elder":{"file":"shots/en-elder-story-2.jpg","h":1126},"hi-adult":{"file":"shots/hi-adult-story-2.jpg","h":921},"hi-kid":{"file":"shots/hi-kid-story-2.jpg","h":981},"hi-elder":{"file":"shots/hi-elder-story-2.jpg","h":1061}}},{"id":"story-3","name":"Part 3","route":null,"from":null,"edge":{"en":"Next","hi":"आगे"},"shots":{"en-adult":{"file":"shots/en-adult-story-3.jpg","h":902},"en-kid":{"file":"shots/en-kid-story-3.jpg","h":984},"en-elder":{"file":"shots/en-elder-story-3.jpg","h":1032},"hi-adult":{"file":"shots/hi-adult-story-3.jpg","h":895},"hi-kid":{"file":"shots/hi-kid-story-3.jpg","h":981},"hi-elder":{"file":"shots/hi-elder-story-3.jpg","h":1027}}},{"id":"story-4","name":"Part 4","route":null,"from":null,"edge":{"en":"Next","hi":"आगे"},"shots":{"en-adult":{"file":"shots/en-adult-story-4.jpg","h":1020},"en-kid":{"file":"shots/en-kid-story-4.jpg","h":1090},"en-elder":{"file":"shots/en-elder-story-4.jpg","h":1176},"hi-adult":{"file":"shots/hi-adult-story-4.jpg","h":1019},"hi-kid":{"file":"shots/hi-kid-story-4.jpg","h":1091},"hi-elder":{"file":"shots/hi-elder-story-4.jpg","h":1179}}},{"id":"story-done","name":"Completion","route":null,"from":null,"edge":{"en":"The end","hi":"कहानी ख़त्म"},"shots":{"en-adult":{"file":"shots/en-adult-story-done.jpg","h":844},"en-kid":{"file":"shots/en-kid-story-done.jpg","h":844},"en-elder":{"file":"shots/en-elder-story-done.jpg","h":844},"hi-adult":{"file":"shots/hi-adult-story-done.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-story-done.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-story-done.jpg","h":844}}},{"id":"story-name","name":"A name: say it, hear it, what it means","route":"/session/why-we-light-diyas","from":"story-1","edge":{"en":"Names in this part","hi":"इस हिस्से के नाम"},"shots":{"en-adult":{"file":"shots/en-adult-story-name.jpg","h":1225},"en-kid":{"file":"shots/en-kid-story-name.jpg","h":1310},"en-elder":{"file":"shots/en-elder-story-name.jpg","h":1454},"hi-adult":{"file":"shots/hi-adult-story-name.jpg","h":1119},"hi-kid":{"file":"shots/hi-kid-story-name.jpg","h":1249},"hi-elder":{"file":"shots/hi-elder-story-name.jpg","h":1408}}},{"id":"names","name":"Names and meanings","route":"/names","from":"story-name","edge":{"en":"All names and meanings","hi":"सारे नाम और मतलब"},"shots":{"en-adult":{"file":"shots/en-adult-names.jpg","h":3059},"en-kid":{"file":"shots/en-kid-names.jpg","h":3358},"en-elder":{"file":"shots/en-elder-names.jpg","h":1650},"hi-adult":{"file":"shots/hi-adult-names.jpg","h":2927},"hi-kid":{"file":"shots/hi-kid-names.jpg","h":3339},"hi-elder":{"file":"shots/hi-elder-names.jpg","h":1583}}}]},{"id":"festival","title":"Festival","about":"Diwali’s five days and a family diya-lighting practice, step by step.","sameInAllModes":false,"steps":[{"id":"diwali","name":"Diwali, day by day","route":"/session/diwali","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-diwali.jpg","h":2056},"en-kid":{"file":"shots/en-kid-diwali.jpg","h":2220},"en-elder":{"file":"shots/en-elder-diwali.jpg","h":2491},"hi-adult":{"file":"shots/hi-adult-diwali.jpg","h":1999},"hi-kid":{"file":"shots/hi-kid-diwali.jpg","h":2214},"hi-elder":{"file":"shots/hi-elder-diwali.jpg","h":2574}}},{"id":"diwali-steps","name":"Diya steps ticked","route":null,"from":null,"edge":{"en":"Tick each step","hi":"हर स्टेप पर टिक"},"shots":{"en-adult":{"file":"shots/en-adult-diwali-steps.jpg","h":2056},"en-kid":{"file":"shots/en-kid-diwali-steps.jpg","h":2220},"en-elder":{"file":"shots/en-elder-diwali-steps.jpg","h":2491},"hi-adult":{"file":"shots/hi-adult-diwali-steps.jpg","h":1999},"hi-kid":{"file":"shots/hi-kid-diwali-steps.jpg","h":2214},"hi-elder":{"file":"shots/hi-elder-diwali-steps.jpg","h":2574}}},{"id":"diwali-done","name":"Completion","route":null,"from":null,"edge":{"en":"We did it together","hi":"हमने साथ मिलकर किया"},"shots":{"en-adult":{"file":"shots/en-adult-diwali-done.jpg","h":844},"en-kid":{"file":"shots/en-kid-diwali-done.jpg","h":844},"en-elder":{"file":"shots/en-elder-diwali-done.jpg","h":844},"hi-adult":{"file":"shots/hi-adult-diwali-done.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-diwali-done.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-diwali-done.jpg","h":844}}}]},{"id":"tabs","title":"Tabs and menu","about":"The bottom bar holds the content categories: Home, Aartis, Stories, Texts, Calm. Each is a set of swipe shelves. Family, profile and settings, switching profile and the four layers sit in the menu under the profile picture.","sameInAllModes":false,"steps":[{"id":"tab-aartis","name":"Aartis tab","route":"/aartis","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-tab-aartis.jpg","h":965},"en-kid":{"file":"shots/en-kid-tab-aartis.jpg","h":1006},"en-elder":{"file":"shots/en-elder-tab-aartis.jpg","h":1186},"hi-adult":{"file":"shots/hi-adult-tab-aartis.jpg","h":915},"hi-kid":{"file":"shots/hi-kid-tab-aartis.jpg","h":997},"hi-elder":{"file":"shots/hi-elder-tab-aartis.jpg","h":1137}}},{"id":"tab-stories","name":"Stories tab","route":"/stories","from":null,"edge":{"en":"Stories","hi":"कहानियाँ"},"shots":{"en-adult":{"file":"shots/en-adult-tab-stories.jpg","h":2940},"en-kid":{"file":"shots/en-kid-tab-stories.jpg","h":3090},"en-elder":{"file":"shots/en-elder-tab-stories.jpg","h":3975},"hi-adult":{"file":"shots/hi-adult-tab-stories.jpg","h":2937},"hi-kid":{"file":"shots/hi-kid-tab-stories.jpg","h":3054},"hi-elder":{"file":"shots/hi-elder-tab-stories.jpg","h":3908}}},{"id":"tab-texts","name":"Texts tab","route":"/texts","from":null,"edge":{"en":"Texts","hi":"ग्रंथ"},"shots":{"en-adult":{"file":"shots/en-adult-tab-texts.jpg","h":1434},"en-kid":{"file":"shots/en-kid-tab-texts.jpg","h":1466},"en-elder":{"file":"shots/en-elder-tab-texts.jpg","h":1898},"hi-adult":{"file":"shots/hi-adult-tab-texts.jpg","h":1494},"hi-kid":{"file":"shots/hi-kid-tab-texts.jpg","h":1533},"hi-elder":{"file":"shots/hi-elder-tab-texts.jpg","h":1896}}},{"id":"tab-calm","name":"Calm tab","route":"/calm","from":null,"edge":{"en":"Calm","hi":"ध्यान"},"shots":{"en-adult":{"file":"shots/en-adult-tab-calm.jpg","h":1230},"en-kid":{"file":"shots/en-kid-tab-calm.jpg","h":1302},"en-elder":{"file":"shots/en-elder-tab-calm.jpg","h":1456},"hi-adult":{"file":"shots/hi-adult-tab-calm.jpg","h":1244},"hi-kid":{"file":"shots/hi-kid-tab-calm.jpg","h":1315},"hi-elder":{"file":"shots/hi-elder-tab-calm.jpg","h":1494}}},{"id":"menu","name":"Menu open","route":null,"from":null,"edge":{"en":"Tap the profile picture","hi":"प्रोफ़ाइल की तस्वीर पर टैप"},"shots":{"en-adult":{"file":"shots/en-adult-menu.jpg","h":1230},"en-kid":{"file":"shots/en-kid-menu.jpg","h":1302},"en-elder":{"file":"shots/en-elder-menu.jpg","h":1456},"hi-adult":{"file":"shots/hi-adult-menu.jpg","h":1244},"hi-kid":{"file":"shots/hi-kid-menu.jpg","h":1315},"hi-elder":{"file":"shots/hi-elder-menu.jpg","h":1494}}},{"id":"chant-meaning","name":"A chant: hear the meaning","route":"/read/chant-om-jai-jagdish-hare","from":"tab-aartis","edge":{"en":"Hear the meaning","hi":"मतलब सुनिए"},"shots":{"en-adult":{"file":"shots/en-adult-chant-meaning.jpg","h":4375},"en-kid":{"file":"shots/en-kid-chant-meaning.jpg","h":4793},"en-elder":{"file":"shots/en-elder-chant-meaning.jpg","h":4800},"hi-adult":{"file":"shots/hi-adult-chant-meaning.jpg","h":3555},"hi-kid":{"file":"shots/hi-kid-chant-meaning.jpg","h":3978},"hi-elder":{"file":"shots/hi-elder-chant-meaning.jpg","h":4584}}}]},{"id":"films-first","title":"Films first","about":"Tapping a card that has a film opens straight onto the film, playing, with the choices and Start under it (founder, 19 Nov 2026). The Gayatri Mantra offers 3, 27 or 108, with 108 chosen. On the flow map a short test clip stands in for the films, which stream from Riti's own storage.","sameInAllModes":false,"steps":[{"id":"film-chalisa","name":"Hanuman Chalisa: film first","route":"/open/hanuman-chalisa","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-film-chalisa.jpg","h":1013},"en-kid":{"file":"shots/en-kid-film-chalisa.jpg","h":1070},"en-elder":{"file":"shots/en-elder-film-chalisa.jpg","h":1149},"hi-adult":{"file":"shots/hi-adult-film-chalisa.jpg","h":979},"hi-kid":{"file":"shots/hi-kid-film-chalisa.jpg","h":1029},"hi-elder":{"file":"shots/hi-elder-film-chalisa.jpg","h":1150}}},{"id":"film-gayatri","name":"Gayatri Mantra: film, 108","route":"/open/gayatri-mantra","from":"film-chalisa","edge":{"en":"Or the Gayatri","hi":"या गायत्री"},"shots":{"en-adult":{"file":"shots/en-adult-film-gayatri.jpg","h":1030},"en-kid":{"file":"shots/en-kid-film-gayatri.jpg","h":1088},"en-elder":{"file":"shots/en-elder-film-gayatri.jpg","h":1220},"hi-adult":{"file":"shots/hi-adult-film-gayatri.jpg","h":967},"hi-kid":{"file":"shots/hi-kid-film-gayatri.jpg","h":1015},"hi-elder":{"file":"shots/hi-elder-film-gayatri.jpg","h":1158}}},{"id":"film-fable","name":"A fable: film first","route":"/open/pt-monkey-and-wedge","from":"film-chalisa","edge":{"en":"Or a story with a film","hi":"या फ़िल्म वाली कहानी"},"shots":{"en-adult":{"file":"shots/en-adult-film-fable.jpg","h":949},"en-kid":{"file":"shots/en-kid-film-fable.jpg","h":998},"en-elder":{"file":"shots/en-elder-film-fable.jpg","h":1164},"hi-adult":{"file":"shots/hi-adult-film-fable.jpg","h":957},"hi-kid":{"file":"shots/hi-kid-film-fable.jpg","h":1019},"hi-elder":{"file":"shots/hi-elder-film-fable.jpg","h":1074}}},{"id":"film-story-part2","name":"Watched the film: the story goes on at part 2","route":"/session/pt-monkey-and-wedge?from=1","from":null,"edge":{"en":"Begin","hi":"शुरू कीजिए"},"shots":{"en-adult":{"file":"shots/en-adult-film-story-part2.jpg","h":844},"en-kid":{"file":"shots/en-kid-film-story-part2.jpg","h":844},"en-elder":{"file":"shots/en-elder-film-story-part2.jpg","h":900},"hi-adult":{"file":"shots/hi-adult-film-story-part2.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-film-story-part2.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-film-story-part2.jpg","h":856}}}]},{"id":"texts","title":"Great texts at five lengths","about":"Hanuman Chalisa and Bhagavad Gita, each on two tracks (step by step, or the whole text) at 90 seconds, 5, 10 and 30 minutes and extended. The wording changes with the mode: Kid gets a child’s wording, Elder gets the verse first and three choices at a time. Panchatantra has its own shelf of 25 fables.","sameInAllModes":false,"steps":[{"id":"text-chalisa","name":"Hanuman Chalisa home","route":"/text/hanuman-chalisa","from":null,"edge":{"en":"Great texts","hi":"बड़े ग्रंथ"},"shots":{"en-adult":{"file":"shots/en-adult-text-chalisa.jpg","h":954},"en-kid":{"file":"shots/en-kid-text-chalisa.jpg","h":1060},"en-elder":{"file":"shots/en-elder-text-chalisa.jpg","h":1100},"hi-adult":{"file":"shots/hi-adult-text-chalisa.jpg","h":930},"hi-kid":{"file":"shots/hi-kid-text-chalisa.jpg","h":1030},"hi-elder":{"file":"shots/hi-elder-text-chalisa.jpg","h":1023}}},{"id":"chalisa-essence","name":"Chalisa · 5 min essence","route":"/read/hanuman-chalisa.learn.5m","from":null,"edge":{"en":"5 min","hi":"5 मिनट"},"shots":{"en-adult":{"file":"shots/en-adult-chalisa-essence.jpg","h":4045},"en-kid":{"file":"shots/en-kid-chalisa-essence.jpg","h":4619},"en-elder":{"file":"shots/en-elder-chalisa-essence.jpg","h":4800},"hi-adult":{"file":"shots/hi-adult-chalisa-essence.jpg","h":3349},"hi-kid":{"file":"shots/hi-kid-chalisa-essence.jpg","h":3770},"hi-elder":{"file":"shots/hi-elder-chalisa-essence.jpg","h":4457}}},{"id":"chalisa-times","name":"Chalisa · extended","route":"/read/hanuman-chalisa.whole.ext","from":"text-chalisa","edge":{"en":"Extended","hi":"लंबा पाठ"},"shots":{"en-adult":{"file":"shots/en-adult-chalisa-times.jpg","h":844},"en-kid":{"file":"shots/en-kid-chalisa-times.jpg","h":844},"en-elder":{"file":"shots/en-elder-chalisa-times.jpg","h":844},"hi-adult":{"file":"shots/hi-adult-chalisa-times.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-chalisa-times.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-chalisa-times.jpg","h":844}}},{"id":"text-gita","name":"Bhagavad Gita home","route":"/text/bhagavad-gita","from":"text-chalisa","edge":{"en":"Great texts","hi":"बड़े ग्रंथ"},"shots":{"en-adult":{"file":"shots/en-adult-text-gita.jpg","h":1007},"en-kid":{"file":"shots/en-kid-text-gita.jpg","h":1144},"en-elder":{"file":"shots/en-elder-text-gita.jpg","h":1119},"hi-adult":{"file":"shots/hi-adult-text-gita.jpg","h":984},"hi-kid":{"file":"shots/hi-kid-text-gita.jpg","h":1082},"hi-elder":{"file":"shots/hi-elder-text-gita.jpg","h":1053}}},{"id":"gita-90","name":"Whole Gita · 90 sec","route":"/read/bhagavad-gita.whole.90s","from":null,"edge":{"en":"The whole text","hi":"पूरा पाठ"},"shots":{"en-adult":{"file":"shots/en-adult-gita-90.jpg","h":1988},"en-kid":{"file":"shots/en-kid-gita-90.jpg","h":2039},"en-elder":{"file":"shots/en-elder-gita-90.jpg","h":2673},"hi-adult":{"file":"shots/hi-adult-gita-90.jpg","h":1921},"hi-kid":{"file":"shots/hi-kid-gita-90.jpg","h":2088},"hi-elder":{"file":"shots/hi-elder-gita-90.jpg","h":2552}}},{"id":"gita-teaching","name":"Gita · 5 min teaching","route":"/read/bhagavad-gita.learn.5m","from":"text-gita","edge":{"en":"5 min","hi":"5 मिनट"},"shots":{"en-adult":{"file":"shots/en-adult-gita-teaching.jpg","h":1947},"en-kid":{"file":"shots/en-kid-gita-teaching.jpg","h":2093},"en-elder":{"file":"shots/en-elder-gita-teaching.jpg","h":2486},"hi-adult":{"file":"shots/hi-adult-gita-teaching.jpg","h":1735},"hi-kid":{"file":"shots/hi-kid-gita-teaching.jpg","h":1884},"hi-elder":{"file":"shots/hi-elder-gita-teaching.jpg","h":2065}}},{"id":"gita-journey","name":"Gita · 18 chapters","route":"/read/bhagavad-gita.learn.ext","from":"text-gita","edge":{"en":"Extended","hi":"लंबा पाठ"},"shots":{"en-adult":{"file":"shots/en-adult-gita-journey.jpg","h":2094},"en-kid":{"file":"shots/en-kid-gita-journey.jpg","h":2288},"en-elder":{"file":"shots/en-elder-gita-journey.jpg","h":846},"hi-adult":{"file":"shots/hi-adult-gita-journey.jpg","h":2253},"hi-kid":{"file":"shots/hi-kid-gita-journey.jpg","h":2387},"hi-elder":{"file":"shots/hi-elder-gita-journey.jpg","h":844}}},{"id":"gita-chapter","name":"Gita · chapter 2","route":"/read/gita-ch-2","from":null,"edge":{"en":"Tap a chapter","hi":"किसी अध्याय पर टैप"},"shots":{"en-adult":{"file":"shots/en-adult-gita-chapter.jpg","h":4039},"en-kid":{"file":"shots/en-kid-gita-chapter.jpg","h":4464},"en-elder":{"file":"shots/en-elder-gita-chapter.jpg","h":4800},"hi-adult":{"file":"shots/hi-adult-gita-chapter.jpg","h":3448},"hi-kid":{"file":"shots/hi-kid-gita-chapter.jpg","h":3852},"hi-elder":{"file":"shots/hi-elder-gita-chapter.jpg","h":4346}}},{"id":"gita-whole-ext","name":"Whole Gita · extended","route":"/read/bhagavad-gita.whole.ext","from":"text-gita","edge":{"en":"The whole text","hi":"पूरा पाठ"},"shots":{"en-adult":{"file":"shots/en-adult-gita-whole-ext.jpg","h":2213},"en-kid":{"file":"shots/en-kid-gita-whole-ext.jpg","h":2414},"en-elder":{"file":"shots/en-elder-gita-whole-ext.jpg","h":994},"hi-adult":{"file":"shots/hi-adult-gita-whole-ext.jpg","h":2338},"hi-kid":{"file":"shots/hi-kid-gita-whole-ext.jpg","h":2475},"hi-elder":{"file":"shots/hi-elder-gita-whole-ext.jpg","h":926}}},{"id":"gita-full-12","name":"Gita · chapter 12, every verse","route":"/read/gita-full-12","from":null,"edge":{"en":"Tap chapter 12","hi":"अध्याय 12 पर टैप"},"shots":{"en-adult":{"file":"shots/en-adult-gita-full-12.jpg","h":4800},"en-kid":{"file":"shots/en-kid-gita-full-12.jpg","h":4800},"en-elder":{"file":"shots/en-elder-gita-full-12.jpg","h":4800},"hi-adult":{"file":"shots/hi-adult-gita-full-12.jpg","h":4800},"hi-kid":{"file":"shots/hi-kid-gita-full-12.jpg","h":4800},"hi-elder":{"file":"shots/hi-elder-gita-full-12.jpg","h":4800}}},{"id":"gita-full-15","name":"Gita · chapter 15, every verse","route":"/read/gita-full-15","from":"gita-journey","edge":{"en":"Or chapter 15","hi":"या अध्याय 15"},"shots":{"en-adult":{"file":"shots/en-adult-gita-full-15.jpg","h":4800},"en-kid":{"file":"shots/en-kid-gita-full-15.jpg","h":4800},"en-elder":{"file":"shots/en-elder-gita-full-15.jpg","h":4800},"hi-adult":{"file":"shots/hi-adult-gita-full-15.jpg","h":4800},"hi-kid":{"file":"shots/hi-kid-gita-full-15.jpg","h":4800},"hi-elder":{"file":"shots/hi-elder-gita-full-15.jpg","h":4800}}},{"id":"gita-ch-13","name":"Gita · chapter 13 (child's wording in Kid mode)","route":"/read/gita-ch-13","from":"gita-journey","edge":{"en":"Tap chapter 13","hi":"अध्याय 13 पर टैप"},"shots":{"en-adult":{"file":"shots/en-adult-gita-ch-13.jpg","h":1850},"en-kid":{"file":"shots/en-kid-gita-ch-13.jpg","h":2336},"en-elder":{"file":"shots/en-elder-gita-ch-13.jpg","h":2479},"hi-adult":{"file":"shots/hi-adult-gita-ch-13.jpg","h":1765},"hi-kid":{"file":"shots/hi-kid-gita-ch-13.jpg","h":2256},"hi-elder":{"file":"shots/hi-elder-gita-ch-13.jpg","h":2269}}},{"id":"panchatantra","name":"Panchatantra shelf","route":"/panchatantra","from":"text-chalisa","edge":{"en":"Panchatantra","hi":"पंचतंत्र"},"shots":{"en-adult":{"file":"shots/en-adult-panchatantra.jpg","h":4800},"en-kid":{"file":"shots/en-kid-panchatantra.jpg","h":4800},"en-elder":{"file":"shots/en-elder-panchatantra.jpg","h":882},"hi-adult":{"file":"shots/hi-adult-panchatantra.jpg","h":4752},"hi-kid":{"file":"shots/hi-kid-panchatantra.jpg","h":4800},"hi-elder":{"file":"shots/hi-elder-panchatantra.jpg","h":852}}},{"id":"fable","name":"A fable, part 1","route":"/session/pt-lion-and-rabbit","from":null,"edge":{"en":"Tap a story","hi":"किसी कहानी पर टैप"},"shots":{"en-adult":{"file":"shots/en-adult-fable.jpg","h":844},"en-kid":{"file":"shots/en-kid-fable.jpg","h":890},"en-elder":{"file":"shots/en-elder-fable.jpg","h":965},"hi-adult":{"file":"shots/hi-adult-fable.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-fable.jpg","h":857},"hi-elder":{"file":"shots/hi-elder-fable.jpg","h":934}}},{"id":"epic","name":"Ramayana, episode 1","route":"/open/ram-1-the-bow","from":"text-chalisa","edge":{"en":"Stories tab → Ramayana","hi":"कहानियाँ टैब → रामायण"},"shots":{"en-adult":{"file":"shots/en-adult-epic.jpg","h":844},"en-kid":{"file":"shots/en-kid-epic.jpg","h":844},"en-elder":{"file":"shots/en-elder-epic.jpg","h":913},"hi-adult":{"file":"shots/hi-adult-epic.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-epic.jpg","h":870},"hi-elder":{"file":"shots/hi-elder-epic.jpg","h":925}}},{"id":"god-story","name":"A story of the gods","route":"/session/rama-and-the-squirrel","from":"text-chalisa","edge":{"en":"Or from the library","hi":"या लाइब्रेरी से"},"shots":{"en-adult":{"file":"shots/en-adult-god-story.jpg","h":960},"en-kid":{"file":"shots/en-kid-god-story.jpg","h":1018},"en-elder":{"file":"shots/en-elder-god-story.jpg","h":1097},"hi-adult":{"file":"shots/hi-adult-god-story.jpg","h":959},"hi-kid":{"file":"shots/hi-kid-god-story.jpg","h":1017},"hi-elder":{"file":"shots/hi-elder-god-story.jpg","h":1071}}}]},{"id":"more","title":"More of the library","about":"One example of each other kind: a mantra meditation, an Upanishad story for older children, and two more festival packs. Every practice uses one of these same four players.","sameInAllModes":false,"steps":[{"id":"soham","name":"So’ham meditation","route":"/session/so-ham","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-soham.jpg","h":844},"en-kid":{"file":"shots/en-kid-soham.jpg","h":844},"en-elder":{"file":"shots/en-elder-soham.jpg","h":860},"hi-adult":{"file":"shots/hi-adult-soham.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-soham.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-soham.jpg","h":880}}},{"id":"nachiketa","name":"Nachiketa, part 1","route":"/session/nachiketa","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-nachiketa.jpg","h":977},"en-kid":{"file":"shots/en-kid-nachiketa.jpg","h":1062},"en-elder":{"file":"shots/en-elder-nachiketa.jpg","h":1162},"hi-adult":{"file":"shots/hi-adult-nachiketa.jpg","h":973},"hi-kid":{"file":"shots/hi-kid-nachiketa.jpg","h":1063},"hi-elder":{"file":"shots/hi-elder-nachiketa.jpg","h":1147}}},{"id":"navratri","name":"Navratri","route":"/session/navratri","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-navratri.jpg","h":2193},"en-kid":{"file":"shots/en-kid-navratri.jpg","h":2491},"en-elder":{"file":"shots/en-elder-navratri.jpg","h":2757},"hi-adult":{"file":"shots/hi-adult-navratri.jpg","h":2219},"hi-kid":{"file":"shots/hi-kid-navratri.jpg","h":2469},"hi-elder":{"file":"shots/hi-elder-navratri.jpg","h":2671}}},{"id":"holi","name":"Holi","route":"/session/holi","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-holi.jpg","h":2052},"en-kid":{"file":"shots/en-kid-holi.jpg","h":2270},"en-elder":{"file":"shots/en-elder-holi.jpg","h":2543},"hi-adult":{"file":"shots/hi-adult-holi.jpg","h":1997},"hi-kid":{"file":"shots/hi-kid-holi.jpg","h":2216},"hi-elder":{"file":"shots/hi-elder-holi.jpg","h":2492}}}]},{"id":"learn","title":"Learning path","about":"The four layers (Body → Mind → Bliss → Soul) and where each teaching comes from.","sameInAllModes":false,"steps":[{"id":"practice-2","name":"Library","route":"/practice","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-practice-2.jpg","h":1887},"en-kid":{"file":"shots/en-kid-practice-2.jpg","h":1956},"en-elder":{"file":"shots/en-elder-practice-2.jpg","h":1465},"hi-adult":{"file":"shots/hi-adult-practice-2.jpg","h":1955},"hi-kid":{"file":"shots/hi-kid-practice-2.jpg","h":2056},"hi-elder":{"file":"shots/hi-elder-practice-2.jpg","h":1438}}},{"id":"layers","name":"Four layers of you","route":"/layers","from":null,"edge":{"en":"What are the four layers?","hi":"चार परतें क्या हैं?"},"shots":{"en-adult":{"file":"shots/en-adult-layers.jpg","h":4781},"en-kid":{"file":"shots/en-kid-layers.jpg","h":4268},"en-elder":{"file":"shots/en-elder-layers.jpg","h":4800},"hi-adult":{"file":"shots/hi-adult-layers.jpg","h":4477},"hi-kid":{"file":"shots/hi-kid-layers.jpg","h":3992},"hi-elder":{"file":"shots/hi-elder-layers.jpg","h":4800}}},{"id":"soul-item","name":"A Soul-layer practice","route":"/session/who-is-watching","from":"layers","edge":{"en":"Tap a practice in a layer","hi":"किसी लेयर की प्रैक्टिस पर टैप"},"shots":{"en-adult":{"file":"shots/en-adult-soul-item.jpg","h":844},"en-kid":{"file":"shots/en-kid-soul-item.jpg","h":844},"en-elder":{"file":"shots/en-elder-soul-item.jpg","h":860},"hi-adult":{"file":"shots/hi-adult-soul-item.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-soul-item.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-soul-item.jpg","h":914}}}]},{"id":"family","title":"Family","about":"Family streak, who practised today, and switching between profiles (each with its own language and mode).","sameInAllModes":false,"steps":[{"id":"family","name":"Family","route":"/family","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-family.jpg","h":917},"en-kid":{"file":"shots/en-kid-family.jpg","h":968},"en-elder":{"file":"shots/en-elder-family.jpg","h":1015},"hi-adult":{"file":"shots/hi-adult-family.jpg","h":924},"hi-kid":{"file":"shots/hi-kid-family.jpg","h":975},"hi-elder":{"file":"shots/hi-elder-family.jpg","h":1008}}},{"id":"profiles","name":"Switch profile","route":"/profiles","from":null,"edge":{"en":"Tap an avatar","hi":"किसी अवतार पर टैप"},"shots":{"en-adult":{"file":"shots/en-adult-profiles.jpg","h":844},"en-kid":{"file":"shots/en-kid-profiles.jpg","h":844},"en-elder":{"file":"shots/en-elder-profiles.jpg","h":844},"hi-adult":{"file":"shots/hi-adult-profiles.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-profiles.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-profiles.jpg","h":844}}}]},{"id":"me","title":"Profile and settings","about":"Language, mode, reminder, plan (monthly or yearly), content still to produce, about, privacy and terms.","sameInAllModes":false,"steps":[{"id":"me","name":"Profile","route":"/me","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-me.jpg","h":1076},"en-kid":{"file":"shots/en-kid-me.jpg","h":1170},"en-elder":{"file":"shots/en-elder-me.jpg","h":1273},"hi-adult":{"file":"shots/hi-adult-me.jpg","h":1103},"hi-kid":{"file":"shots/hi-kid-me.jpg","h":1197},"hi-elder":{"file":"shots/hi-elder-me.jpg","h":1287}}},{"id":"plan","name":"Plan","route":"/plan","from":null,"edge":{"en":"Subscription","hi":"प्लान"},"shots":{"en-adult":{"file":"shots/en-adult-plan.jpg","h":844},"en-kid":{"file":"shots/en-kid-plan.jpg","h":844},"en-elder":{"file":"shots/en-elder-plan.jpg","h":846},"hi-adult":{"file":"shots/hi-adult-plan.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-plan.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-plan.jpg","h":893}}},{"id":"status","name":"Still to produce","route":"/status","from":"me","edge":{"en":"What is still to be made","hi":"क्या-क्या बनना बाकी है"},"shots":{"en-adult":{"file":"shots/en-adult-status.jpg","h":4800},"en-kid":{"file":"shots/en-kid-status.jpg","h":4800},"en-elder":{"file":"shots/en-elder-status.jpg","h":4800},"hi-adult":{"file":"shots/hi-adult-status.jpg","h":4800},"hi-kid":{"file":"shots/hi-kid-status.jpg","h":4800},"hi-elder":{"file":"shots/hi-elder-status.jpg","h":4800}}},{"id":"about","name":"About","route":"/about","from":"me","edge":{"en":"About Riti","hi":"रीति के बारे में"},"shots":{"en-adult":{"file":"shots/en-adult-about.jpg","h":844},"en-kid":{"file":"shots/en-kid-about.jpg","h":844},"en-elder":{"file":"shots/en-elder-about.jpg","h":932},"hi-adult":{"file":"shots/hi-adult-about.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-about.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-about.jpg","h":964}}},{"id":"privacy","name":"Privacy","route":"/privacy","from":"me","edge":{"en":"Privacy","hi":"प्राइवेसी"},"shots":{"en-adult":{"file":"shots/en-adult-privacy.jpg","h":844},"en-kid":{"file":"shots/en-kid-privacy.jpg","h":844},"en-elder":{"file":"shots/en-elder-privacy.jpg","h":844},"hi-adult":{"file":"shots/hi-adult-privacy.jpg","h":844},"hi-kid":{"file":"shots/hi-kid-privacy.jpg","h":844},"hi-elder":{"file":"shots/hi-elder-privacy.jpg","h":844}}},{"id":"terms","name":"Terms","route":"/terms","from":"me","edge":{"en":"Terms","hi":"शर्तें"},"shots":{"en-adult":{"file":"shots/en-adult-terms.jpg","h":888},"en-kid":{"file":"shots/en-kid-terms.jpg","h":1056},"en-elder":{"file":"shots/en-elder-terms.jpg","h":1335},"hi-adult":{"file":"shots/hi-adult-terms.jpg","h":898},"hi-kid":{"file":"shots/hi-kid-terms.jpg","h":1032},"hi-elder":{"file":"shots/hi-elder-terms.jpg","h":1246}}}]},{"id":"developer","title":"Developer tools","about":"Hidden from families (long-press the logo, or Me → Developer tools). Used to check the build and to mark line timings when a singer’s recording arrives.","sameInAllModes":true,"steps":[{"id":"dev","name":"Developer tools","route":"/dev","from":null,"edge":null,"shots":{"en-adult":{"file":"shots/en-adult-dev.jpg","h":1849},"hi-adult":{"file":"shots/hi-adult-dev.jpg","h":1940}}},{"id":"timing","name":"Tap timing","route":"/timing/om-jai-jagdish-hare","from":null,"edge":{"en":"Tap timing","hi":"टैप टाइमिंग"},"shots":{"en-adult":{"file":"shots/en-adult-timing.jpg","h":844},"hi-adult":{"file":"shots/hi-adult-timing.jpg","h":844}}}]}],"errors":["en/adult/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","en/adult/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","en/adult/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","en/kid/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","en/kid/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","en/kid/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","en/elder/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","en/elder/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","en/elder/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","hi/adult/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","hi/adult/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","hi/adult/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","hi/kid/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","hi/kid/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","hi/kid/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","hi/elder/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","hi/elder/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD","hi/elder/films-first: play() failed because the user didn't interact with the document first. https://goo.gl/xX8pDD"]};
+// Set only on the public review site (scripts/flowmap/review-site.mts): the address of the Supabase function
+// that saves ticks for reviewers who open their personal link (?r=…). Inside claude.ai it stays null.
+const API = "https://sxovqabtbpzwtwsesdjn.supabase.co/functions/v1/screen-review";
+const $ = (s) => document.querySelector(s);
+const store = { get(k, d) { try { return localStorage.getItem('flowmap.' + k) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem('flowmap.' + k, v); } catch {} } };
+const S = { lang: store.get('lang', 'en'), mode: store.get('mode', 'adult'), len: store.get('len', 'short'), zoom: +store.get('zoom', '0') || 0 };
+const MODE_NAME = { adult: 'Adult', kid: 'Kid', elder: 'Elder' };
+
+$('#meta').textContent = `${M.flows.reduce((n, f) => n + f.steps.reduce((m, s) => m + Object.keys(s.shots).length, 0), 0)} screens · ${M.flows.reduce((n, f) => n + f.steps.length, 0)} steps · ${M.flows.length} flows · built ${new Date(M.generated).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}${M.commit ? ' · ' + M.commit : ''}`;
+
+function seg(id, key) {
+  const el = $('#' + id);
+  const sync = () => el.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === S[key])));
+  el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; S[key] = b.dataset.v; store.set(key, S[key]); sync(); render(); });
+  sync();
+}
+seg('lang', 'lang'); seg('mode', 'mode'); seg('len', 'len');
+
+const shot = (step, flow, lang) => step.shots[`${lang}-${flow.sameInAllModes ? 'adult' : S.mode}`];
+const langs = () => (S.lang === 'both' ? ['en', 'hi'] : [S.lang]);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+function edgeHTML(step, flow) {
+  const e = step.edge || { en: '', hi: '' };
+  const from = step.from ? flow.steps.find((s) => s.id === step.from) : null;
+  const lbl = S.lang === 'both' ? `${esc(e.en)}<span class="hi">${esc(e.hi)}</span>` : S.lang === 'hi' ? `<span class="hi" style="color:var(--ink)">${esc(e.hi)}</span>` : esc(e.en);
+  return `<div class="edge${from ? ' branch' : ''}" aria-hidden="true">
+    ${from ? `<div class="from">from ${esc(from.name)}</div>` : ''}
+    <svg viewBox="0 0 150 18" preserveAspectRatio="none"><line class="shaft" x1="6" y1="9" x2="138" y2="9" stroke="var(--arrow)" stroke-width="2"/><path d="M136 3 L146 9 L136 15 Z" fill="var(--arrow)"/></svg>
+    <div class="lbl">${lbl}</div></div>`;
+}
+
+function render() {
+  document.body.classList.toggle('short', S.len === 'short');
+  $('#lanes').innerHTML = M.flows.map((f, i) => `<a href="#${f.id}">${i + 1} · ${esc(f.title)}</a>`).join('');
+  $('#canvas').innerHTML = M.flows.map((f, fi) => `
+    <section class="lane" id="${f.id}" aria-labelledby="h-${f.id}">
+      <div class="lane-head"><span class="n">${String(fi + 1).padStart(2, '0')}</span><h2 id="h-${f.id}">${esc(f.title)}</h2>
+        ${f.sameInAllModes && S.mode !== 'adult' ? `<span class="tag">Same in every mode</span>` : ''}<p>${esc(f.about)}</p></div>
+      <div class="track">${f.steps.map((s, si) => `${si ? edgeHTML(s, f) : ''}
+        <div class="step"><div class="cap"><span class="idx">${si + 1}</span><b>${esc(s.name)}</b>${s.route && s.route !== '/' ? `<code>${esc(s.route)}</code>` : ''}</div>
+          <div class="pair">${langs().map((l) => { const sh = shot(s, f, l); const k = keyOf(f, s, l); return `<div class="${cellClass(k, sh)}" data-k="${esc(k)}"><button class="frame" data-f="${fi}" data-s="${si}" aria-label="${esc(s.name)}, ${l === 'hi' ? 'Hindi' : 'English'}, open larger">
+            ${S.lang === 'both' ? `<span class="lang">${l === 'hi' ? 'हिन्दी' : 'EN'}</span>` : ''}
+            ${sh ? `<img src="${sh.file}" alt="${esc(s.name)} screen, ${l === 'hi' ? 'Hindi' : 'English'}, ${MODE_NAME[S.mode]} mode" loading="lazy" decoding="async">` : `<div class="missing">Not captured: re-run the flow map</div>`}
+          </button>${sh ? rvHTML(k) : ''}</div>`; }).join('')}</div></div>`).join('')}</div>
+    </section>`).join('') + `<p class="foot">Screens are captured automatically from the latest app build (the same one as the preview), with a sample family loaded. To refresh after changes: <code>npm run preview:build && npm run flowmap</code>.</p>`;
+  applyZoom();
+}
+
+// Zoom: CSS zoom on the canvas keeps native scrolling for panning.
+const board = $('#board'), canvas = $('#canvas');
+function fitZoom() { const w = board.clientWidth; return Math.max(.2, Math.min(1, w / (w < 700 ? 420 : 1500))); }
+function applyZoom() { if (!S.zoom) S.zoom = fitZoom(); canvas.style.zoom = S.zoom; $('#zval').textContent = Math.round(S.zoom * 100) + '%'; }
+const setZoom = (z) => { S.zoom = Math.max(.2, Math.min(2, Math.round(z * 20) / 20)); store.set('zoom', S.zoom); applyZoom(); };
+$('#zin').onclick = () => setZoom(S.zoom + .1); $('#zout').onclick = () => setZoom(S.zoom - .1); $('#zfit').onclick = () => setZoom(fitZoom());
+board.addEventListener('wheel', (e) => { if (e.ctrlKey || e.metaKey) { e.preventDefault(); setZoom(S.zoom * (e.deltaY < 0 ? 1.1 : 0.9)); } }, { passive: false });
+
+// Drag to pan (mouse); touch uses native scrolling.
+let drag = null;
+board.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse' || e.button !== 0 || e.target.closest('.frame')) return; drag = { x: e.clientX, y: e.clientY, l: board.scrollLeft, t: board.scrollTop }; board.classList.add('drag'); });
+addEventListener('pointermove', (e) => { if (!drag) return; board.scrollLeft = drag.l - (e.clientX - drag.x); board.scrollTop = drag.t - (e.clientY - drag.y); });
+addEventListener('pointerup', () => { drag = null; board.classList.remove('drag'); });
+
+// Lane links scroll inside the board.
+$('#lanes').addEventListener('click', (e) => { const a = e.target.closest('a'); if (!a) return; e.preventDefault(); jump(a.getAttribute('href').slice(1)); });
+function jump(id) { const el = document.getElementById(id); if (!el) return; board.scrollTo({ top: el.offsetTop * S.zoom - 12, left: 0, behavior: 'smooth' }); }
+
+// Lightbox
+let cur = null;
+canvas.addEventListener('click', (e) => { if (e.target.closest('.rv')) return; const b = e.target.closest('.frame'); if (b) openLB(+b.dataset.f, +b.dataset.s); });
+function openLB(f, s) {
+  cur = { f, s }; const flow = M.flows[f], step = flow.steps[s];
+  $('#lbt').textContent = `${flow.title} · ${s + 1}. ${step.name}`;
+  $('#lbr').textContent = `${step.route || ''} · ${MODE_NAME[flow.sameInAllModes ? 'adult' : S.mode]}`;
+  $('#lbb').innerHTML = langs().map((l) => { const sh = shot(step, flow, l); const k = keyOf(flow, step, l); return `<figure class="${cellClass(k, sh)}" data-k="${esc(k)}" style="width:auto"><figcaption>${l === 'hi' ? 'हिन्दी' : 'English'}</figcaption>${sh ? `<img src="${sh.file}" alt="${esc(step.name)}, ${l === 'hi' ? 'Hindi' : 'English'}">${rvHTML(k)}` : '<p>Not captured</p>'}</figure>`; }).join('');
+  $('#lbprev').disabled = s === 0; $('#lbnext').disabled = s === flow.steps.length - 1;
+  $('#lb').hidden = false; $('#lbx').focus();
+}
+const closeLB = () => { $('#lb').hidden = true; cur = null; };
+$('#lbx').onclick = closeLB;
+$('#lbprev').onclick = () => cur && cur.s > 0 && openLB(cur.f, cur.s - 1);
+$('#lbnext').onclick = () => cur && cur.s < M.flows[cur.f].steps.length - 1 && openLB(cur.f, cur.s + 1);
+addEventListener('keydown', (e) => { if (!cur) return; if (e.key === 'Escape') closeLB(); if (e.key === 'ArrowLeft') $('#lbprev').click(); if (e.key === 'ArrowRight') $('#lbnext').click(); });
+
+
+// ── Review: approve each screen, note what needs changing, count per reviewer ────────────────────
+// Stored in the artifact's database, one document per reviewer: reviews/<reviewer id> =
+// { screens: { "<flow>~<step>~<lang>-<mode>": { s: "ok" | "fix", n: note, at: ISO date, b: build } }, updated }.
+// Only ids are stored, never names. Reviewers see their own; the owner and editors see everyone's.
+const R = { ready: false, db: null, user: null, uid: null, admin: false, canWrite: false, mine: {}, all: {}, saving: false, dirty: false, timer: 0, pending: new Set(), token: null, name: '',
+  on: store.get('review', '1') === '1', hide: store.get('hideReviewed', '0') === '1' };
+const keyOf = (f, s, l) => `${f.id}~${s.id}~${l}-${f.sameInAllModes ? 'adult' : S.mode}`;
+const ALL = []; M.flows.forEach((f) => f.steps.forEach((s) => Object.keys(s.shots).forEach((lm) => ALL.push({ key: `${f.id}~${s.id}~${lm}`, flow: f.title, step: s.name, lang: lm.split('-')[0], mode: lm.split('-')[1] }))));
+const INFO = Object.fromEntries(ALL.map((a) => [a.key, a]));
+function cellClass(k, sh) {
+  const m = R.ready ? R.mine[k] : null;
+  return ['cell', m && m.s === 'ok' ? 'ok' : '', m && m.s === 'fix' ? 'fix' : '', R.ready && R.hide && m && m.s ? 'done-hidden' : ''].join(' ').trim();
+}
+function tally(k) { let ok = 0, fix = 0; for (const id in R.all) { const v = R.all[id][k]; if (v && v.s === 'ok') ok++; else if (v && v.s === 'fix') fix++; } return { ok, fix }; }
+function rvHTML(k) {
+  if (!R.ready) return '';
+  const m = R.mine[k] || {}, dis = R.canWrite ? '' : ' disabled';
+  const t = R.admin ? tally(k) : null;
+  return `<div class="rv" data-k="${esc(k)}"><button class="ok" data-a="ok" aria-pressed="${m.s === 'ok'}"${dis}>✓ Approve</button><button class="fix" data-a="fix" aria-pressed="${m.s === 'fix'}"${dis}>Needs change</button>`
+    + (t && (t.ok || t.fix) ? `<span class="who">All reviewers: ✓ ${t.ok}${t.fix ? ' · needs change ' + t.fix : ''}</span>` : '')
+    + (m.s === 'fix' || m.n ? `<textarea data-k="${esc(k)}" aria-label="What should change on this screen?" placeholder="What should change?"${dis}>${esc(m.n || '')}</textarea>` : '') + '</div>';
+}
+function refreshKey(k) {
+  document.querySelectorAll(`[data-k="${CSS.escape(k)}"].cell, figure[data-k="${CSS.escape(k)}"]`).forEach((c) => { c.className = cellClass(k, true); const rv = c.querySelector('.rv'); if (rv) rv.outerHTML = rvHTML(k); });
+}
+const setMsg = (t) => { $('#rvmsg').textContent = t; };
+function queueSave() { clearTimeout(R.timer); R.timer = setTimeout(save, 500); setMsg('Saving…'); }
+async function save() {
+  if (R.saving) { R.dirty = true; return; }
+  R.saving = true;
+  try {
+    if (API) {
+      const keys = [...R.pending]; R.pending.clear();
+      for (const k of keys) {
+        const v = R.mine[k] || {};
+        const res = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ r: R.token, key: k, s: v.s || null, n: v.n || '', b: M.commit || '' }) });
+        if (!res.ok) { keys.forEach((x) => R.pending.add(x)); throw { code: res.status === 404 ? 'unknown_link' : 'unavailable' }; }
+      }
+    } else await R.db.doc('reviews/' + R.uid).set({ screens: R.mine, updated: new Date().toISOString() });
+    setMsg(`Saved · you have reviewed ${countMine().reviewed} of ${ALL.length} screens`); }
+  catch (e) {
+    if (e && e.code === 'unknown_link') { R.canWrite = false; setMsg('This review link is no longer active. Ask Riti for a new one.'); render(); }
+    else if (e && e.code === 'invalid_argument') { R.canWrite = false; setMsg('You can look but not review here. Ask the owner for Contributor access.'); render(); }
+    else setMsg('Not saved. Check your connection and try again.');
+  }
+  R.saving = false;
+  if (R.dirty) { R.dirty = false; save(); }
+}
+function countOf(screens) { let ok = 0, fix = 0, last = ''; for (const k in screens) { const v = screens[k]; if (!INFO[k] || !v) continue; if (v.s === 'ok') ok++; else if (v.s === 'fix') fix++; if (v.at > last) last = v.at; } return { ok, fix, reviewed: ok + fix, last }; }
+const countMine = () => countOf(R.mine);
+function onReviewClick(e) {
+  const b = e.target.closest('.rv button'); if (!b || !R.canWrite) return;
+  e.stopPropagation();
+  const k = b.closest('.rv').dataset.k, a = b.dataset.a, cur = R.mine[k] || {};
+  // Pressing the chosen button again takes the tick back (a note, if any, is kept).
+  if (cur.s === a) { const { s: _, ...rest } = cur; if (rest.n) R.mine[k] = { ...rest, at: new Date().toISOString() }; else delete R.mine[k]; }
+  else R.mine[k] = { ...cur, s: a, at: new Date().toISOString(), b: M.commit || '' };
+  R.pending.add(k); refreshKey(k); queueSave();
+}
+function onReviewInput(e) {
+  const t = e.target.closest('.rv textarea'); if (!t || !R.canWrite) return;
+  const k = t.dataset.k, cur = R.mine[k] || { s: 'fix' };
+  R.mine[k] = { ...cur, n: t.value.slice(0, 2000), at: new Date().toISOString(), b: M.commit || '' };
+  R.pending.add(k); queueSave();
+}
+canvas.addEventListener('click', onReviewClick, true); $('#lbb').addEventListener('click', onReviewClick, true);
+canvas.addEventListener('input', onReviewInput); $('#lbb').addEventListener('input', onReviewInput);
+
+function pillSync() { $('#rvon').setAttribute('aria-pressed', String(R.on)); $('#rvhide').setAttribute('aria-pressed', String(R.hide)); document.body.classList.toggle('reviewing', R.on); }
+$('#rvon').onclick = () => { R.on = !R.on; store.set('review', R.on ? '1' : '0'); pillSync(); };
+$('#rvhide').onclick = () => { R.hide = !R.hide; store.set('hideReviewed', R.hide ? '1' : '0'); pillSync(); render(); };
+
+// Reviews panel: per-reviewer counts for payment, and a CSV of every tick and note.
+async function openPanel() {
+  const ids = Object.keys(R.all); if (!ids.includes(R.uid) && Object.keys(R.mine).length) ids.push(R.uid);
+  let names = {}; if (API) names = { [R.uid]: { name: R.name } }; else try { names = await R.user.profiles(ids); } catch {}
+  const rows = ids.map((id) => ({ id, name: (names[id] && names[id].name) || (id === R.uid ? 'You' : 'Someone'), c: countOf(id === R.uid ? R.mine : R.all[id]) })).sort((a, b) => b.c.reviewed - a.c.reviewed);
+  let anyOk = 0, anyFix = 0; for (const a of ALL) { const t = tally(a.key); if (t.ok) anyOk++; else if (t.fix) anyFix++; }
+  const day = (d) => d ? new Date(d).toLocaleDateString([], { dateStyle: 'medium' }) : '—';
+  const body = $('#rpb'); body.textContent = '';
+  const sum = document.createElement('p'); sum.className = 'sum';
+  sum.textContent = R.admin ? `${anyOk} of ${ALL.length} screens approved by at least one reviewer · ${anyFix} need changes · ${ALL.length - anyOk - anyFix} not reviewed yet.` : `You have reviewed ${countMine().reviewed} of ${ALL.length} screens.`;
+  body.append(sum);
+  const tbl = document.createElement('table');
+  tbl.innerHTML = '<thead><tr><th>Reviewer</th><th class="n">Screens reviewed</th><th class="n">Approved</th><th class="n">Needs change</th><th>Last active</th></tr></thead><tbody></tbody>';
+  for (const r of rows) { const tr = document.createElement('tr'); [r.name, r.c.reviewed, r.c.ok, r.c.fix, day(r.c.last)].forEach((v, i) => { const td = document.createElement('td'); if (i && i < 4) td.className = 'n'; td.textContent = String(v); tr.append(td); }); tbl.tBodies[0].append(tr); }
+  if (!rows.length) { const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = 5; td.textContent = 'No reviews yet.'; tr.append(td); tbl.tBodies[0].append(tr); }
+  body.append(tbl);
+  const act = document.createElement('div'); act.className = 'act';
+  const dl = document.createElement('button'); dl.className = 'pill'; dl.textContent = 'Download all ticks and notes (CSV)';
+  dl.onclick = () => downloadCSV(rows); act.append(dl); body.append(act);
+  const note = document.createElement('p'); note.className = 'note';
+  note.textContent = 'A screen counts once per reviewer, whether approved or marked "needs change". Each tick records the build it was given on. ' + (R.admin ? '' : 'Only the owner sees everyone’s reviews.');
+  body.append(note);
+  $('#rp').hidden = false; $('#rpx').focus();
+}
+const cell = (v) => { let t = String(v ?? ''); if (/^[=+\-@]/.test(t)) t = "'" + t; return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+async function downloadCSV(rows) {
+  const lines = [['Reviewer', 'Flow', 'Screen', 'Language', 'Mode', 'Status', 'Note', 'Date', 'Build', 'Screen key'].join(',')];
+  for (const r of rows) { const screens = r.id === R.uid ? R.mine : R.all[r.id]; for (const k in screens) { const v = screens[k], i = INFO[k]; if (!i || !v) continue; lines.push([r.name, i.flow, i.step, i.lang === 'hi' ? 'Hindi' : 'English', MODE_NAME[i.mode] || i.mode, v.s === 'ok' ? 'Approved' : v.s === 'fix' ? 'Needs change' : '', v.n || '', v.at ? v.at.slice(0, 10) : '', v.b || '', k].map(cell).join(',')); } }
+  const filename = `riti-screen-review-${new Date().toISOString().slice(0, 10)}.csv`;
+  if (API) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' })); a.download = filename; document.body.append(a); a.click(); a.remove(); return; }
+  try { const dlc = await claude.use('downloads'); if (!dlc) { setMsg('Downloads are not available here.'); return; } await dlc.save({ filename, data: lines.join('\n') }); }
+  catch (e) { setMsg('The download did not complete.'); }
+}
+$('#rvopen').onclick = openPanel;
+$('#rpx').onclick = () => { $('#rp').hidden = true; };
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#rp').hidden) $('#rp').hidden = true; });
+
+async function apiInit() {
+  $('#rvbar').hidden = false;
+  document.title = 'Riti screen review'; const h1 = $('.brand h1'); if (h1 && h1.lastChild) h1.lastChild.textContent = ' screen review';
+  const t = new URLSearchParams(location.search).get('r');
+  if (!t) { $('#rvon').hidden = $('#rvhide').hidden = $('#rvopen').hidden = true; setMsg('To tick screens, open the personal review link you were sent.'); return; }
+  try {
+    const res = await fetch(API + '?r=' + encodeURIComponent(t));
+    if (res.status === 404) { $('#rvon').hidden = $('#rvhide').hidden = $('#rvopen').hidden = true; setMsg('This review link is not active. Ask Riti for a new one.'); return; }
+    if (!res.ok) throw new Error();
+    const d = await res.json();
+    Object.assign(R, { token: t, uid: 'me', name: d.name || 'You', mine: d.ticks || {}, canWrite: true, admin: false, ready: true });
+    R.all = { me: R.mine };
+    pillSync(); render(); setMsg(`Welcome, ${R.name}. You have reviewed ${countMine().reviewed} of ${ALL.length} screens.`);
+  } catch { setMsg('Your reviews could not load. Check your connection and reload the page.'); }
+}
+(async () => {
+  if (API) return apiInit();
+  if (!window.claude || !window.claude.use) return;
+  const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
+  if (!db || !user) return;
+  const uid = await user.id();
+  $('#rvbar').hidden = false;
+  if (!uid) { $('#rvon').hidden = $('#rvhide').hidden = $('#rvopen').hidden = true; setMsg('Sign in to claude.ai to review screens.'); return; }
+  Object.assign(R, { db, user, uid });
+  R.admin = !!(await user.canEdit());
+  const cw = await user.can('data.write'); R.canWrite = cw !== false;
+  if (!R.canWrite) setMsg('You can look but not review here. Ask the owner for Contributor access.');
+  const giveUp = setTimeout(() => { if (!R.ready) setMsg('Reviews could not load. Reload the page to try again.'); }, 10000);
+  db.collection('reviews').onSnapshot((snap) => {
+    clearTimeout(giveUp);
+    const all = {}; snap.docs.forEach((d) => { const v = d.data(); if (v && v.screens) all[d.id] = v.screens; });
+    if (!R.ready) { R.mine = JSON.parse(JSON.stringify(all[uid] || {})); R.ready = true; R.all = all; pillSync(); render(); if (R.canWrite) setMsg(`You have reviewed ${countMine().reviewed} of ${ALL.length} screens`); }
+    else { all[uid] = R.mine; R.all = all; }
+  }, () => { clearTimeout(giveUp); setMsg('Reviews could not load. Reload the page to try again.'); });
+})();
+
+render();
+if (location.hash) setTimeout(() => jump(location.hash.slice(1)), 50);
+</script>
